@@ -8,19 +8,18 @@ const path = require("path");
 
 const app = express();
 
-// Make sure upload directory exists
-const uploadDir = path.join(__dirname, "uploads");
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir);
+const uploadFolder = path.join(__dirname, "uploads");
+
+// Ensure uploads folder exists
+if (!fs.existsSync(uploadFolder)) {
+  fs.mkdirSync(uploadFolder);
 }
 
-const upload = multer({ dest: uploadDir });
+const upload = multer({ dest: uploadFolder });
 
 app.post("/upload", upload.single("file"), async (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ error: "No file uploaded" });
-  }
-  
+  if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+
   try {
     const form = new FormData();
     form.append("file", fs.createReadStream(req.file.path));
@@ -30,13 +29,12 @@ app.post("/upload", upload.single("file"), async (req, res) => {
       headers: form.getHeaders(),
     });
 
-    // Delete local file after upload
-    fs.unlinkSync(req.file.path);
+    fs.unlinkSync(req.file.path); // Clean temp file
 
     if (response.data.success) {
       return res.json({ fileUrl: response.data.link });
     } else {
-      return res.status(500).json({ error: "File.io upload failed" });
+      return res.status(500).json({ error: "Upload failed to file.io" });
     }
   } catch (error) {
     return res.status(500).json({ error: error.message });
@@ -45,5 +43,5 @@ app.post("/upload", upload.single("file"), async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`✅ Server running on port ${PORT}`);
+  console.log(`Server started on port ${PORT}`);
 });
