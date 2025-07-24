@@ -1,14 +1,15 @@
+
 {
-  "name": "chat-backend",
+  "name": "duper-chat",
+  "version": "1.0.0",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
   "dependencies": {
-    "axios": "^1.6.8",
-    "cors": "^2.8.5",
     "express": "^4.18.2",
-    "form-data": "^4.0.0",
-    "multer": "^1.4.5"
+    "socket.io": "^4.7.2",
+    "multer": "^1.4.5-lts.1",
+    "cors": "^2.8.5"
   }
 }
