@@ -1,30 +1,35 @@
-
-
-const express = require('express');
-const http = require('http');
-const { Server } = require('socket.io');
-const path = require('path');
-const cors = require('cors');
+const express = require("express");
+const http = require("http");
+const { Server } = require("socket.io");
+const cors = require("cors");
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: "*", // or use your actual Netlify domain
-    methods: ["GET", "POST"]
-  }
+    origin: "*", // Change this to your Netlify frontend URL if needed
+    methods: ["GET", "POST"],
+  },
 });
 
-
 app.use(cors());
-app.use(express.static('frontend'));
+app.get("/", (req, res) => {
+  res.send("Duper Chat backend is running.");
+});
 
-io.on('connection', (socket) => {
-  socket.on('chat message', (data) => {
-    io.emit('chat message', data);
+io.on("connection", (socket) => {
+  console.log("A user connected");
+
+  socket.on("chat message", (data) => {
+    io.emit("chat message", data);
+  });
+
+  socket.on("disconnect", () => {
+    console.log("A user disconnected");
   });
 });
 
-server.listen(process.env.PORT || 3000, () => {
-  console.log('Server is running');
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+  console.log(`Server listening on port ${PORT}`);
 });
