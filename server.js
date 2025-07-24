@@ -1,47 +1,51 @@
-// index.js
 const express = require("express");
 const multer = require("multer");
 const axios = require("axios");
-const FormData = require("form-data");
 const fs = require("fs");
+const FormData = require("form-data");
 const path = require("path");
+const cors = require("cors");
 
 const app = express();
+const PORT = process.env.PORT || 3000;
 
-const uploadFolder = path.join(__dirname, "uploads");
+app.use(cors());
+app.use(express.json());
+app.use(express.static("public"));
 
-// Ensure uploads folder exists
-if (!fs.existsSync(uploadFolder)) {
-  fs.mkdirSync(uploadFolder);
-}
+const upload = multer({ dest: "uploads/" });
+const users = new Set(); // store usernames
 
-const upload = multer({ dest: uploadFolder });
+// Check username uniqueness
+app.post("/username", (req, res) => {
+  const { username } = req.body;
+  if (users.has(username)) {
+    return res.status(409).json({ error: "Username already taken" });
+  }
+  users.add(username);
+  res.json({ success: true });
+});
 
+// Handle uploads to File.io
 app.post("/upload", upload.single("file"), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: "No file uploaded" });
 
-  try {
-    const form = new FormData();
-    form.append("file", fs.createReadStream(req.file.path));
-    form.append("expires", "7d");
+  const formData = new FormData();
+  formData.append("file", fs.createReadStream(req.file.path));
 
-    const response = await axios.post("https://file.io", form, {
-      headers: form.getHeaders(),
+  try {
+    const response = await axios.post("https://file.io", formData, {
+      headers: formData.getHeaders(),
     });
 
-    fs.unlinkSync(req.file.path); // Clean temp file
-
-    if (response.data.success) {
-      return res.json({ fileUrl: response.data.link });
-    } else {
-      return res.status(500).json({ error: "Upload failed to file.io" });
-    }
-  } catch (error) {
-    return res.status(500).json({ error: error.message });
+    // delete temp file
+    fs.unlink(req.file.path, () => {});
+    res.json({ link: response.data.link });
+  } catch (err) {
+    res.status(500).json({ error: "Upload failed" });
   }
 });
 
-const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`Server started on port ${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 });
