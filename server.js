@@ -1,37 +1,70 @@
-import express from "express";
-import http from "http";
-import { Server } from "socket.io";
-import cors from "cors";
-
+const express = require('express');
+const multer = require('multer');
+const fs = require('fs');
+const cors = require('cors');
+const axios = require('axios');
 const app = express();
-const server = http.createServer(app);
-
-const io = new Server(server, {
-  cors: {
-    origin: "*", // Set to your Netlify frontend URL if needed
-    methods: ["GET", "POST"],
-  },
-});
+const PORT = process.env.PORT || 3000;
 
 app.use(cors());
+app.use(express.json());
+const upload = multer({ dest: 'uploads/' });
 
-app.get("/", (req, res) => {
-  res.send("Duper Chat backend is running.");
+let users = JSON.parse(fs.existsSync('users.json') ? fs.readFileSync('users.json') : '{}');
+let messages = JSON.parse(fs.existsSync('messages.json') ? fs.readFileSync('messages.json') : '{}');
+
+function saveJSON() {
+  fs.writeFileSync('users.json', JSON.stringify(users, null, 2));
+  fs.writeFileSync('messages.json', JSON.stringify(messages, null, 2));
+}
+
+app.post('/register', (req, res) => {
+  const { username, password } = req.body;
+  if (users[username]) return res.json({ message: 'Username exists' });
+
+  users[username] = { password };
+  messages[username] = [];
+  saveJSON();
+  res.json({ message: 'Registered successfully' });
 });
 
-io.on("connection", (socket) => {
-  console.log("A user connected");
+app.post('/login', (req, res) => {
+  const { username, password } = req.body;
+  if (!users[username] || users[username].password !== password)
+    return res.json({ message: 'Invalid credentials' });
 
-  socket.on("chat message", (data) => {
-    io.emit("chat message", data);
-  });
-
-  socket.on("disconnect", () => {
-    console.log("A user disconnected");
-  });
+  res.json({ message: 'Login successful' });
 });
 
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log(`Server listening on port ${PORT}`);
+app.post('/message', upload.single('file'), async (req, res) => {
+  const { username, message } = req.body;
+  let fileUrl = null;
+
+  if (req.file) {
+    try {
+      const response = await axios.post('https://api.gofile.io/uploadFile', {}, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        params: {
+          file: fs.createReadStream(req.file.path)
+        }
+      });
+      fileUrl = response.data.data.downloadPage;
+    } catch {
+      fileUrl = null;
+    }
+
+    fs.unlinkSync(req.file.path);
+  }
+
+  if (!messages[username]) messages[username] = [];
+  messages[username].push({ text: message, fileUrl, timestamp: Date.now() });
+  saveJSON();
+  res.json({ message: 'Message saved' });
 });
+
+app.get('/messages/:username', (req, res) => {
+  const userMessages = messages[req.params.username] || [];
+  res.json(userMessages);
+});
+
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
