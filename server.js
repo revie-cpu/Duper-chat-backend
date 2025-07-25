@@ -40,27 +40,39 @@ app.post('/login', (req, res) => {
 app.post('/message', upload.single('file'), async (req, res) => {
   const { username, message } = req.body;
   let fileUrl = null;
+  let uploadResponse = null;
+  let uploadError = null;
 
-  if (req.file) {
-    try {
-      const response = await axios.post('https://api.gofile.io/uploadFile', {}, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-        params: {
-          file: fs.createReadStream(req.file.path)
-        }
+  try {
+    if (req.file) {
+      const form = new FormData();
+      form.append('file', fs.createReadStream(req.file.path));
+
+      const response = await axios.post('https://api.gofile.io/uploadFile', form, {
+        headers: form.getHeaders(),
       });
-      fileUrl = response.data.data.downloadPage;
-    } catch {
-      fileUrl = null;
-    }
 
-    fs.unlinkSync(req.file.path);
+      uploadResponse = response.data;
+      fileUrl = response.data?.data?.downloadPage || null;
+
+      fs.unlinkSync(req.file.path);
+    }
+  } catch (err) {
+    uploadError = err.message;
+    console.error('Upload failed:', uploadError);
   }
 
   if (!messages[username]) messages[username] = [];
-  messages[username].push({ text: message, fileUrl, timestamp: Date.now() });
+  const newMessage = { text: message, fileUrl, timestamp: Date.now() };
+  messages[username].push(newMessage);
   saveJSON();
-  res.json({ message: 'Message saved' });
+
+  res.json({ 
+    message: 'Message saved', 
+    fileUrl,
+    uploadResponse,
+    uploadError
+  });
 });
 
 app.get('/messages/:username', (req, res) => {
